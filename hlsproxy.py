@@ -218,6 +218,7 @@ class HlsPlaylist:
         for item in self.items:
             res += "#EXTINF:" + str(item.dur) + ",\n"
             res += item.relativeUrl + "\n"
+        res += "EXT-X-ENDLIST" + "\n"
         return res
 
     def toStrVariant(self):
@@ -403,23 +404,40 @@ class HlsProxy:
             self.onVariantPlaylist(playlist)
 
     def onSegmentPlaylist(self, playlist):
-        #deline old files
-        if not(self.download):
-            for item in self.clientPlaylist.items:
-                if playlist.getItem(item.mediaSequence) is None:
-                    try:
-                        os.unlink(self.getSegmentFilename(item))
-                    except:
-                        print "Warning. Cannot remove fragment ", self.getSegmentFilename(item), ". Probably it wasn't downloaded in time."
-        #request new ones
-        for item in playlist.items:
-            if self.clientPlaylist.getItem(item.mediaSequence) is None:
-                self.requestFragment(item)
-        #update the playlist
-        self.clientPlaylist = playlist
-        self.refreshClientPlaylist()
-        #wind playlist timer
-        self.reactor.callLater(playlist.targetDuration, self.refreshPlaylist)
+        if self.starttime is not None: # TODO: check and parse start and end time in onVariantPlaylist()
+            #clip the designated range's video
+            startIndex = 100 # only for test, calculate it using starttime and endtime
+            destDuration = 300 # seconds
+            sumDuration = 0
+            self.clientPlaylist = playlist
+            for item in playlist.items:
+                if item.mediaSequence-self.mediaSequence>100:
+                    if self.clientPlaylist.getItem(item.mediaSequence) is None:
+                        sumDuration += item.dur
+                        self.requestFragment(item)
+                elif sumDuration > destDuration:
+                    print "Finish clipping video from ", self.starttime " to " self.endtime
+                    break
+            self.refreshClientPlaylist()
+
+         else:
+            #delete old files if enabling
+            if not(self.download):
+                for item in self.clientPlaylist.items:
+                    if playlist.getItem(item.mediaSequence) is None:
+                        try:
+                            os.unlink(self.getSegmentFilename(item))
+                        except:
+                            print "Warning. Cannot remove fragment ", self.getSegmentFilename(item), ". Probably it wasn't downloaded in time."
+            #request new ones
+            for item in playlist.items:
+                if self.clientPlaylist.getItem(item.mediaSequence) is None:
+                    self.requestFragment(item)
+            #update the playlist
+            self.clientPlaylist = playlist
+            self.refreshClientPlaylist()
+            #wind playlist timer
+            self.reactor.callLater(playlist.targetDuration, self.refreshPlaylist)
 
     def onVariantPlaylist(self, playlist):
         print "Found variant playlist."
@@ -460,6 +478,8 @@ class HlsProxy:
         subProxy.verbose = self.verbose
         subProxy.download = self.download
         subProxy.referer = self.referer
+        subProxy.starttime = self.starttime
+        subProxy.endtime = self.endtime
         subProxy.dump_durations = self.dump_durations
         subProxy.save_individual_playlists = self.save_individual_playlists
         subProxy.setOutDir(subOutDir)
@@ -496,6 +516,7 @@ class HlsProxy:
         self.dur_dump_file.flush()
 
     # Create custom playlist file according to downloaded ts clips and origin playlist
+    # TODO: There is a bug that it can't add #EXT-X-ENDLIST, also can't parse it
     def refreshClientPlaylist(self):
         playlist = self.clientPlaylist
         pl = HlsPlaylist()
@@ -598,6 +619,8 @@ def runProxy(reactor, args):
     proxy.verbose = args.v
     proxy.download = args.d
     proxy.referer = args.referer
+    proxy.starttime = args.starttime
+    proxy.endtime = args.endtime
     proxy.dump_durations = args.dump_durations
     proxy.save_individual_playlists = args.save_individual_playlists
     if not(args.o is None):
@@ -613,6 +636,8 @@ def main():
     parser.add_argument("--dump-durations", action="store_true")
     parser.add_argument("--save-individual-playlists", action="store_true")
     parser.add_argument("--referer")
+    parser.add_argument("--starttime") # format like 15:15:30
+    parser.add_argument("--endtime")
     parser.add_argument("-o");
     args = parser.parse_args()
 

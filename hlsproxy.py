@@ -370,13 +370,13 @@ class HlsProxy:
         return self.outDir + self.getSegmentRelativeUrl(item)
 
     def getSegmentRelativeUrl(self, item):
-        return "stream" + str(item.mediaSequence) + ".ts"
+        return str(item.mediaSequence) + ".ts"
 
     def getClientPlaylist(self):
-        return self.outDir + "stream.m3u8"
+        return self.outDir + "index.m3u8"
 
     def get_individial_client_playlist(self, media_sequence):
-        return self.outDir + "stream." + str(media_sequence) + ".m3u8"
+        return self.outDir + "index." + str(media_sequence) + ".m3u8"
 
     def onPlaylist(self, playlist):
         if playlist.isValid():
@@ -433,7 +433,7 @@ class HlsProxy:
             
             masterVariant = copy.deepcopy(variant)
             masterPlaylist.variants.append(masterVariant)
-            masterVariant.absoluteUrl = str(variant.bandwidth) + "/stream.m3u8"
+            masterVariant.absoluteUrl = str(variant.bandwidth) + "/index.m3u8"
             
             self.start_subproxy(subOutDir, variant.absoluteUrl)
 
@@ -447,7 +447,7 @@ class HlsProxy:
             
             proxiedMedia = copy.deepcopy(media)
             masterPlaylist.medias.append(proxiedMedia)
-            proxiedMedia.absoluteUrl = os.path.join(relativePath, "stream.m3u8")
+            proxiedMedia.absoluteUrl = os.path.join(relativePath, "index.m3u8")
             
             if media.relativeUrl:
                 # EXT-X-MEDIA URI is optional so it's possible to have a media wihtout relativeUrl
@@ -495,6 +495,7 @@ class HlsProxy:
                                 vt_acc=self.dur_vt_acc, vt_m3u8_acc_diff=self.dur_vt_acc - self.dur_playlist_acc))
         self.dur_dump_file.flush()
 
+    # Create custom playlist file according to downloaded ts clips and origin playlist
     def refreshClientPlaylist(self):
         playlist = self.clientPlaylist
         pl = HlsPlaylist()
